@@ -1,5 +1,12 @@
 # Bunjo
 
+#### Technologies
+
+- [ ] Typescript
+- [ ] Remix
+- [ ] Prisma
+- [ ] OPENAI API
+
 
  ![AI_Screenshot_1](https://user-images.githubusercontent.com/85137475/174498430-5e9eafcd-d281-48be-b7f4-be80468b07f0.png)
 
