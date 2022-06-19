@@ -1,16 +1,28 @@
-import { Form, Link, useActionData } from "@remix-run/react";
+import {
+  Form,
+  Link,
+  useActionData,
+  useLoaderData,
+  useTransition,
+} from "@remix-run/react";
 
 import { useUser } from "~/utils";
 import { requireUserId } from "~/session.server";
 import { ActionFunction, json, LoaderFunction } from "@remix-run/node";
-import { getUserById } from "~/models/user.server";
+import { getUserById, UpdateTokens } from "~/models/user.server";
 import { error } from "console";
-import { addCompletion } from "~/models/completions.server";
+import {
+  addCompletion,
+  getMostRecentCompletions,
+} from "~/models/completions.server";
+import { Completion } from "@prisma/client";
 
 export const loader: LoaderFunction = async ({ request }) => {
   const userId = await requireUserId(request);
+  const currentUser = await getUserById(userId);
+  const recentCompletions = await getMostRecentCompletions(String(userId));
 
-  return json({ ok: true });
+  return json({ recentCompletions, currentUser });
 };
 
 export const action: ActionFunction = async ({ request }) => {
@@ -62,24 +74,28 @@ export const action: ActionFunction = async ({ request }) => {
 
     const data = await response.json();
     const completionText = data.choices[0].text;
-
+    // Save the completion to the database
     const addedCompletion = await addCompletion({
       aiCompletion: completionText,
       userId,
       prompt: String(body.prompt),
       tokens: Number(body.tokens),
     });
+    console.log("asdsfasfa");
+    console.log(addedCompletion);
+    // Update the user tokens if request is successful
 
-    console.log(addedCompletion)
+    const updatedTokens = await UpdateTokens(
+      userId,
+      Number(currentUser && currentUser?.tokens - Number(body.tokens))
+    );
+
+    return json({ errors: undefined, addedCompletion });
   } catch (error: any) {
+    console.log(error);
     // if not successful return error
-    return json({ error: error.message });
+    return json({ errors: error.message });
   }
-
-  // Save the completion to the database
-  // Update the user tokens if request is successful
-
-  return json({ ok: true, errors });
 };
 
 // Create the form for input
@@ -87,9 +103,10 @@ export const action: ActionFunction = async ({ request }) => {
 // Bring recent completion onto page from the database
 
 export default function Writing() {
-  const user = useUser();
-
   const errors = useActionData();
+  const loaderData = useLoaderData();
+  const { currentUser: user, recentCompletions } = loaderData;
+  const transition = useTransition();
 
   return (
     <div className="text-slate-100">
@@ -109,26 +126,30 @@ export default function Writing() {
       <h1 className="text-2xl font-bold ">AI Writing Tool</h1>
 
       <Form method="post">
-        <fieldset className="mt-4 w-full">
+        <fieldset
+          disabled={transition.state === "submitting"}
+          className="mt-4 w-full"
+        >
           <textarea
             name="prompt"
             id="prompt"
             rows={5}
-            className="w-full rounded-sm bg-slate-800 p-4 text-slate-200"
+            className="w-full rounded-sm bg-slate-800 p-4 text-slate-200 disabled:bg-slate-800 disabled:text-slate-400"
           ></textarea>
 
           {errors && <p className="text-sm text-red-700">{errors.tokens}</p>}
+
           <div className="mt-4 flex items-center">
             <input
               type="number"
               name="tokens"
               id="tokens"
               defaultValue={150}
-              className="w-24 rounded-sm bg-slate-800 p-4 text-slate-200"
+              className="w-24 rounded-sm bg-slate-800 p-4 text-slate-200 disabled:bg-slate-900"
             />
             <button
               type="submit"
-              className="ml-4 rounded bg-slate-600 py-2 px-4 text-blue-100 hover:bg-blue-500 active:bg-blue-600"
+              className="ml-4 rounded bg-slate-600 py-2 px-4 text-blue-100 hover:bg-blue-500 active:bg-blue-600 disabled:bg-slate-800 disabled:hover:bg-slate-800"
             >
               Submit
             </button>
@@ -138,6 +159,45 @@ export default function Writing() {
           </div>
         </fieldset>
       </Form>
+      {transition.state && transition.state === "submitting" && (
+        <div className="my-8 flex justify-center">
+          <div className="loader">Loading...</div>
+        </div>
+      )}
+
+      <div className="mt-8">
+        <h1 className="text-xl font-bold text-indigo-500">
+          Recent Completions
+        </h1>
+        {recentCompletions &&
+          recentCompletions.map((completion: Completion) => {
+            let text: any = completion.answer;
+            if (text.includes("\n")) {
+              text = text.split("\n");
+            }
+            text = [...text];
+            return (
+              <div className="mt-8" key={completion.id}>
+                <h3 className="text-semibold  font-mono text-xl font-bold underline">
+                  {completion.prompt}
+                </h3>
+                <div>
+                  {text &&
+                    text.map((line: string) => (
+                      <p
+                        className="mt-2"
+                        key={`${line}-${Math.random()
+                          .toString(36)
+                          .slice(2, 7)}`}
+                      >
+                        {line}
+                      </p>
+                    ))}
+                </div>
+              </div>
+            );
+          })}
+      </div>
     </div>
   );
 }

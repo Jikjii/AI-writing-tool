@@ -1,6 +1,14 @@
 import { prisma } from "~/db.server";
 import type { User } from "@prisma/client";
 
+export async function getMostRecentCompletions(userId: User["id"]) {
+  return prisma.completion.findMany({
+    where: { userId },
+    orderBy: { createdAt: "desc" },
+    take: 5,
+  });
+}
+
 export function addCompletion({
   userId,
   aiCompletion,
@@ -18,7 +26,7 @@ export function addCompletion({
       answer: aiCompletion,
       tokens: Number(tokens),
       user: {
-        connect: { id: userId },
+        connect: { id: String(userId) },
       },
     },
   });

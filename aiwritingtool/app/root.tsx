@@ -12,12 +12,19 @@ import {
   Scripts,
   ScrollRestoration,
 } from "@remix-run/react";
+import globalCss from "../public/styles/globals.css";
 
 import tailwindStylesheetUrl from "./styles/tailwind.css";
 import { getUser } from "./session.server";
 
 export const links: LinksFunction = () => {
-  return [{ rel: "stylesheet", href: tailwindStylesheetUrl }];
+  return [
+    { rel: "stylesheet", href: tailwindStylesheetUrl },
+    {
+      rel: "stylesheet",
+      href: globalCss,
+    },
+  ];
 };
 
 export const meta: MetaFunction = () => ({
@@ -43,7 +50,7 @@ export default function App() {
         <Meta />
         <Links />
       </head>
-      <body className="min-h-screen bg-slate-900">
+      <body className="min-h-screen bg-slate-900 px-4 sm:px-6">
         <Outlet />
         <ScrollRestoration />
         <Scripts />
