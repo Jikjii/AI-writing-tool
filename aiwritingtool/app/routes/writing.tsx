@@ -1,8 +1,10 @@
-import { Form, Link } from "@remix-run/react";
+import { Form, Link, useActionData } from "@remix-run/react";
 
 import { useUser } from "~/utils";
 import { requireUserId } from "~/session.server";
 import { ActionFunction, json, LoaderFunction } from "@remix-run/node";
+import { getUserById } from "~/models/user.server";
+import { error } from "console";
 
 export const loader: LoaderFunction = async ({ request }) => {
   const userId = await requireUserId(request);
@@ -12,18 +14,31 @@ export const loader: LoaderFunction = async ({ request }) => {
 
 export const action: ActionFunction = async ({ request }) => {
   const userId = await requireUserId(request);
+  const currentUser = await getUserById(userId);
 
   const reqBody = await request.formData();
   const body = Object.fromEntries(reqBody);
 
+  const errors = {
+    tokens:
+      currentUser && Number(body.tokens) > currentUser.tokens
+        ? "Not enough tokens"
+        : undefined,
+  };
+
+  const hasErrors = Object.values(errors).some((errorMessage) => errorMessage);
+
   // Check the user has enough tokens to make request
+  if (hasErrors) {
+    return json(errors);
+  }
   // If not enough return an error
   // Make the request to OPENAI API
   // if not successful return error
   // Save the completion to the database
   // Update the user tokens if request is successful
 
-  return json({ ok: true });
+  return json({ ok: true, errors });
 };
 
 // Create the form for input
@@ -32,6 +47,8 @@ export const action: ActionFunction = async ({ request }) => {
 
 export default function Writing() {
   const user = useUser();
+
+  const errors = useActionData();
 
   return (
     <div className="text-slate-100">
@@ -58,6 +75,8 @@ export default function Writing() {
             rows={5}
             className="w-full rounded-sm bg-slate-800 p-4 text-slate-200"
           ></textarea>
+
+          {errors && <p className="text-sm text-red-700">{errors.tokens}</p>}
           <div className="mt-4 flex items-center">
             <input
               type="number"
